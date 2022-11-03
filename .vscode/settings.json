@@ -1,0 +1,19 @@
+{
+    "files.associations": {
+        "socket.h": "c",
+        "msgpack.h": "c",
+        "errno.h": "c",
+        "unistd.h": "c",
+        "signal.h": "c",
+        "unpack.h": "c",
+        "stdio.h": "c",
+        "string.h": "c",
+        "unix_gateway.h": "c",
+        "pthread.h": "c",
+        "mm_malloc.h": "c"
+    },
+    "C_Cpp.default.includePath": [
+        "/opt/homebrew/include "
+    ],
+    "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools"
+}
