@@ -12,8 +12,8 @@ if(NOT msgpack_FOUND)
     return()
 endif()
 
-include_directories(include/)
-file(GLOB SOURCES src/*.c)
+include_directories(include/ deps/)
+file(GLOB SOURCES src/*.c deps/*/*.c)
 
 add_executable(commutator ${SOURCES})
 target_link_libraries(commutator msgpackc)

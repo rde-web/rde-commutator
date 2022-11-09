@@ -5,25 +5,21 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include "rde-commutator/err.h"
+#include "rde-commutator/config.h"
 #include "rde-commutator/unpack.h"
 #include "rde-commutator/tcp_gateway.h"
 #include "rde-commutator/unix_gateway.h"
 
-volatile int listener;
-
-const char remote_register_ok = 0;
-const char remote_register_fail = 1;
-const unsigned short max_msg_size = 256;
-const unsigned int max_cons = 10;
+volatile int sock;
 
 void onInterrupt(int arg) {
-    close(listener);
+    close(sock);
 }
 
 void* handle(void* arg) {
     int conn = *((int *)arg);
-    char msg[max_msg_size];
-    memset(msg, '\0', max_msg_size);
+    char msg[MAX_MSG_SIZE];
+    // memset(msg, '\0', max_msg_size);
 
     if (recv(conn, msg, sizeof(msg), 0) < 0){
         printerr("recieve");
@@ -43,16 +39,15 @@ void* handle(void* arg) {
     }
 
     if (did->forward != NULL) {
-        // forward_daemon_message(conn);
+        forward_daemon_message(conn, did->forward, msg);
     }
     
     if (did->serve != NULL) {
-        serve_daemon_gateway(conn);
+        serve_daemon_gateway(conn, did->serve);
     }
 
 DEFER:
     close(conn);
-    printf("will exit now\n");
     pthread_exit(NULL);
     return (void*)0;
 }
@@ -60,8 +55,8 @@ DEFER:
 int serve_tcp_gateway(const char * addr, const unsigned short port) {
     signal(SIGINT, onInterrupt);
     struct sockaddr_in server_addr;
-    listener = socket(AF_INET, SOCK_STREAM, 0);
-    if (listener < 0) {
+    sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) {
         printerr("create socket");
         return -1;
     }
@@ -72,7 +67,7 @@ int serve_tcp_gateway(const char * addr, const unsigned short port) {
     
     if (
         bind(
-            listener,
+            sock,
             (struct sockaddr*)&server_addr,
             sizeof(server_addr)
         ) < 0
@@ -81,17 +76,15 @@ int serve_tcp_gateway(const char * addr, const unsigned short port) {
         return -1;
     }
     
-    if(listen(listener, 1) < 0){
+    if(listen(sock, TCP_BACKLOG) < 0){
         printerr("listen");
         return -1;
     }
 
-    unsigned short cons = 0;
-
     while(true) {
         struct sockaddr_in client_addr;
-        int client_size = sizeof(client_addr);
-        int conn = accept(listener, (struct sockaddr*)&client_addr, (socklen_t *)&client_size);
+        socklen_t cl_size = sizeof(client_addr);
+        int conn = accept(sock, (struct sockaddr*)&client_addr, &cl_size);
         if (conn < 0) {
             printerr("accept");
             break;
@@ -103,6 +96,6 @@ int serve_tcp_gateway(const char * addr, const unsigned short port) {
             break;
         };
     }
-    close(listener);
+    close(sock);
     return -1;
 }

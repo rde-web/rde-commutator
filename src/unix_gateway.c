@@ -1,84 +1,136 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <errno.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include "rde-commutator/err.h"
+#include "rde-commutator/config.h"
+#include "path-join/path-join.h"
 
-#define SOCK_PATH  "tpf_unix_sock.server"
-#define DATA "Hello from server"
-
-int serve_daemon_gateway(int tcp_connection) {
-    int server_sock, client_sock, len, rc;
-    int bytes_rec = 0;
-    struct sockaddr_un server_sockaddr;
-    struct sockaddr_un client_sockaddr;     
-    char buf[256];
-    int backlog = 10;
-    memset(&server_sockaddr, 0, sizeof(struct sockaddr_un));
-    memset(&client_sockaddr, 0, sizeof(struct sockaddr_un));
-    memset(buf, 0, 256);                
+void serve_daemon_gateway(int tcp_connection, const char* id) {
+    char* sock_path = path_join(DAEMON_SOCK_LOCATION, id);
     
-    server_sock = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (server_sock == -1) {
-        printerr("unix create socket");
-        return -1;
-    }
+    struct sockaddr_un sockaddr;
+    memset(&sockaddr, 0, sizeof(struct sockaddr_un));
 
-    server_sockaddr.sun_family = AF_UNIX;   
-    strcpy(server_sockaddr.sun_path, SOCK_PATH); 
-    len = sizeof(server_sockaddr);
-
-    unlink(SOCK_PATH);
-    rc = bind(server_sock, (struct sockaddr *) &server_sockaddr, len);
-    if (rc == -1) {
-        printerr("unxi bind");
-        close(server_sock);
-        return -1;
-    }
-
-    rc = listen(server_sock, backlog);
-    if (rc == -1){ 
-        printerr("unix listen");
-        close(server_sock);
-        return -1;
-    }
-
-    client_sock = accept(server_sock, (struct sockaddr *) &client_sockaddr, &len);
-    if (client_sock == -1) {
-        printerr("unix accept");
-        close(server_sock);
-        close(client_sock);
-        return -1;
-    }
-
-    if ((recv(client_sock, buf, sizeof(buf), 0)) < 0) {
-        printerr("unix recieve");
-        close(server_sock);
-        close(client_sock);
-        return -1;
-    }
-
-    rc = send(client_sock, buf, strlen(buf), 0);
-    if (rc == -1) {
-        printf("SEND ERROR: %d", sock_errno());
-        printerr("unix send");
-        close(server_sock);
-        close(client_sock);
-        printerr("unix send");
-    }
-
-    close(server_sock);
-    close(client_sock);
-    
-    return 0;
-}
-
-int forward_daemon_message(int tcp_connection, const char * msg) {
-    if (send(tcp_connection, msg, strlen(msg), 0) < 0) {
-        printerr("tcp send");
+    int sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sock == -1) {
+        printerr("unix->tcp create");
         return;
     }
+    
+    sockaddr.sun_family = AF_UNIX;   
+    strcpy(sockaddr.sun_path, sock_path); 
+    unlink(sock_path);
+
+    if(bind(sock, (struct sockaddr *) &sockaddr, sizeof(sockaddr)) < 0) {
+        printerr("unix->tcp bind");
+        close(sock);
+        return;
+    }
+
+    if (listen(sock, UNIX_BACKLOG) < 0) {
+        printerr("unix->tcp listen");
+        close(sock);
+        return;
+    }
+
+    while (true) {
+        char in[MAX_MSG_SIZE], out[MAX_MSG_SIZE];
+        struct sockaddr_un connaddr;
+        socklen_t cl_addr_size = sizeof(connaddr);
+        int conn = accept(sock, (struct sockaddr *) &connaddr, &cl_addr_size);
+        if (conn == -1) {
+            printerr("unix->tcp accept");
+            close(conn);
+            break;
+        }
+        // MARK: - unix read
+        if ((recv(conn, in, sizeof(in), 0)) < 0) {
+            printerr("unix->tcp recv");
+            close(conn);
+            continue;
+        }
+        // MARK: - tcp write
+        if (send(tcp_connection, in, strlen(in), 0) < 0) {
+            printerr("unix->tcp send tcp");
+            close(conn);
+            break; //@note most likely daemon connection is closed
+        }
+        // MARK: - tcp read
+        if ((recv(tcp_connection, out, sizeof(out), 0) < 0)) {
+            printerr("unix->tcp recv tcp");
+            close(conn);
+            break; //@note most likely daemon connection is closed
+        }
+        // MARK: - unix write
+        if((send(conn, out, strlen(out), 0)) < 0){
+            printerr("unix-tcp send");
+            close(conn);
+            continue;
+        }
+        close(conn);
+    }
+    close(sock);
+    return;
+}
+
+void forward_daemon_message(int tcp_connection, const char * id, char * msg) {
+    char* client_sock_path = path_join(CLIENT_SOCK_LOCATION, id);
+    char* daemon_sock_path = path_join(DAEMON_SOCK_LOCATION, id);
+
+    char out[MAX_MSG_SIZE];
+
+    int sock;
+    struct sockaddr_un server_sockaddr, client_sockaddr;
+    memset(&server_sockaddr, 0, sizeof(struct sockaddr_un));
+    memset(&client_sockaddr, 0, sizeof(struct sockaddr_un));
+
+    sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sock == -1) {
+        printerr("tcp->unix create");
+        return;
+    }
+
+    client_sockaddr.sun_family = AF_UNIX;   
+    strcpy(client_sockaddr.sun_path, client_sock_path); 
+    socklen_t len = sizeof(client_sockaddr);
+    
+    unlink(client_sock_path);
+
+    if(bind(sock, (struct sockaddr *) &client_sockaddr, len) < 0) {
+        printerr("tcp->unxi bind");
+        close(sock);
+        return;
+    }
+
+    server_sockaddr.sun_family = AF_UNIX;
+    strcpy(server_sockaddr.sun_path, daemon_sock_path);
+    if(connect(sock, (struct sockaddr *) &server_sockaddr, len)){
+        printerr("tcp->unix connect");
+        close(sock);
+        return;
+    }
+          
+    if(send(sock, msg, strlen(msg), 0)){
+        printerr("tcp->unix send unix");
+        close(sock);
+        return;
+    }
+
+    if(recv(sock, out, sizeof(out), 0)){
+        printerr("tcp->unix recv unix");
+        close(sock);
+        return;
+    }
+
+    if (send(tcp_connection, out, strlen(out), 0) < 0) {
+        printerr("tcp->unix send");
+    }
+    close(sock);
+    return;
 }
