@@ -1,0 +1,10 @@
+{
+    "name": "rde-commutator",
+    "version": "1.0.0",
+    "repo": "https://github.com/rde-web/rde-commutator",
+    "dependencies": {
+      "stephenmathieson/path-join.c": "master"
+    },
+    "install": "make install",
+    "uninstall": "make uninstall"
+  }
