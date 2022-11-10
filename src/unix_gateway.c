@@ -13,13 +13,14 @@
 
 void serve_daemon_gateway(int tcp_connection, const char* id) {
     char* sock_path = path_join(DAEMON_SOCK_LOCATION, id);
+    signal(SIGPIPE, SIG_IGN);
     
     struct sockaddr_un sockaddr;
     memset(&sockaddr, 0, sizeof(struct sockaddr_un));
 
     int sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sock == -1) {
-        printerr("unix->tcp create");
+        printerr("daemon->gw create");
         return;
     }
     
@@ -28,13 +29,13 @@ void serve_daemon_gateway(int tcp_connection, const char* id) {
     unlink(sock_path);
 
     if(bind(sock, (struct sockaddr *) &sockaddr, sizeof(sockaddr)) < 0) {
-        printerr("unix->tcp bind");
+        printerr("daemon->gw bind");
         close(sock);
         return;
     }
 
     if (listen(sock, UNIX_BACKLOG) < 0) {
-        printerr("unix->tcp listen");
+        printerr("daemon->gw listen");
         close(sock);
         return;
     }
@@ -45,31 +46,31 @@ void serve_daemon_gateway(int tcp_connection, const char* id) {
         socklen_t cl_addr_size = sizeof(connaddr);
         int conn = accept(sock, (struct sockaddr *) &connaddr, &cl_addr_size);
         if (conn == -1) {
-            printerr("unix->tcp accept");
+            printerr("daemon->gw accept");
             close(conn);
             break;
         }
         // MARK: - unix read
         if ((recv(conn, in, sizeof(in), 0)) < 0) {
-            printerr("unix->tcp recv");
+            printerr("daemon->gw recv");
             close(conn);
             continue;
         }
         // MARK: - tcp write
         if (send(tcp_connection, in, strlen(in), 0) < 0) {
-            printerr("unix->tcp send tcp");
+            printerr("daemon->gw send tcp");
             close(conn);
             break; //@note most likely daemon connection is closed
         }
         // MARK: - tcp read
         if ((recv(tcp_connection, out, sizeof(out), 0) < 0)) {
-            printerr("unix->tcp recv tcp");
+            printerr("daemon->gw recv tcp");
             close(conn);
             break; //@note most likely daemon connection is closed
         }
         // MARK: - unix write
         if((send(conn, out, strlen(out), 0)) < 0){
-            printerr("unix-tcp send");
+            printerr("daemon->gw send");
             close(conn);
             continue;
         }
@@ -92,7 +93,7 @@ void forward_daemon_message(int tcp_connection, const char * id, char * msg) {
 
     sock = socket(AF_UNIX, SOCK_STREAM, 0);
     if (sock == -1) {
-        printerr("tcp->unix create");
+        printerr("gw->daemon create");
         return;
     }
 
@@ -103,7 +104,7 @@ void forward_daemon_message(int tcp_connection, const char * id, char * msg) {
     unlink(client_sock_path);
 
     if(bind(sock, (struct sockaddr *) &client_sockaddr, len) < 0) {
-        printerr("tcp->unxi bind");
+        printerr("gw->daemon bind");
         close(sock);
         return;
     }
@@ -111,25 +112,25 @@ void forward_daemon_message(int tcp_connection, const char * id, char * msg) {
     server_sockaddr.sun_family = AF_UNIX;
     strcpy(server_sockaddr.sun_path, daemon_sock_path);
     if(connect(sock, (struct sockaddr *) &server_sockaddr, len)){
-        printerr("tcp->unix connect");
+        printerr("gw->daemon connect");
         close(sock);
         return;
     }
           
-    if(send(sock, msg, strlen(msg), 0)){
-        printerr("tcp->unix send unix");
+    if(send(sock, msg, strlen(msg), 0) < 0){
+        printerr("gw->daemon send daemon");
         close(sock);
         return;
     }
 
-    if(recv(sock, out, sizeof(out), 0)){
-        printerr("tcp->unix recv unix");
+    if(recv(sock, out, sizeof(out), 0 ) < 0){
+        printerr("gw->daemon recv daemon");
         close(sock);
         return;
     }
 
     if (send(tcp_connection, out, strlen(out), 0) < 0) {
-        printerr("tcp->unix send");
+        printerr("gw->daemon send gw");
     }
     close(sock);
     return;

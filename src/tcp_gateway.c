@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <mm_malloc.h>
 #include <pthread.h>
 #include <arpa/inet.h>
@@ -34,7 +35,7 @@ void* handle(void* arg) {
     }
 
     if (did->serve == NULL && did->forward == NULL) {
-        printf("no daemon id given");
+        printf("no daemon id given\n");
         goto DEFER;
     }
 

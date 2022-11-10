@@ -3,7 +3,8 @@
     "version": "1.0.0",
     "repo": "https://github.com/rde-web/rde-commutator",
     "dependencies": {
-      "stephenmathieson/path-join.c": "master"
+      "stephenmathieson/path-join.c": "master",
+      "kgabis/parson": "master"
     },
     "install": "make install",
     "uninstall": "make uninstall"

@@ -11,7 +11,8 @@
         "unix_gateway.h": "c",
         "pthread.h": "c",
         "mm_malloc.h": "c",
-        "err.h": "c"
+        "err.h": "c",
+        "*.issue": "c"
     },
     "C_Cpp.default.includePath": [
         "/opt/homebrew/include "
