@@ -1,0 +1,38 @@
+// @audit-issue
+// File ignored, issue on #22
+
+#include "rde-commutator/unpack.h"
+
+const char* key_daemon_id = "daemon_id";
+const char* key_forwar_daemon_id = "forward_daemon_id";
+
+bool hasPrefix(const char *str, const char *pre) {
+    return strncmp(pre, str, strlen(pre)) == 0;
+}
+
+daemon_id* unpack_daemon_id(char const* buf, size_t len) {
+    daemon_id* did = &(daemon_id){NULL, NULL};
+    size_t off = 0;
+    msgpack_zone mempool;
+    msgpack_object deserialized;
+    msgpack_unpack(buf, len, NULL, &mempool, &deserialized);
+
+    if (deserialized.type != MSGPACK_OBJECT_MAP) return NULL;
+
+    msgpack_object_kv* map = deserialized.via.map.ptr;
+    const char * key = map->key.via.str.ptr; //@audit-issue key is full buffer
+    const char * val = map->val.via.str.ptr;
+    printf("<%s> <%s>\n", key, val);
+    if (hasPrefix(key, key_daemon_id)) {
+        (*did).serve = val;
+    }
+    if (hasPrefix(key, key_forwar_daemon_id)){
+        (*did).forward = val;
+    }
+    msgpack_zone_destroy(&mempool);
+    return did;
+}
+
+void upack_daemon_id_v2(char const* buf, size_t len) {
+    
+}

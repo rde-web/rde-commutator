@@ -1,7 +1,6 @@
 #include <unistd.h>
 #include <signal.h>
 #include <stdbool.h>
-#include <mm_malloc.h>
 #include <pthread.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -81,6 +80,8 @@ int serve_tcp_gateway(const char * addr, const unsigned short port) {
         printerr("listen");
         return -1;
     }
+
+    printf("TCP listen on %s:%i\n", addr, port);
 
     while(true) {
         struct sockaddr_in client_addr;

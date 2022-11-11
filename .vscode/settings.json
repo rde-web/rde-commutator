@@ -12,7 +12,10 @@
         "pthread.h": "c",
         "mm_malloc.h": "c",
         "err.h": "c",
-        "*.issue": "c"
+        "*.issue": "c",
+        "path-join.h": "c",
+        "un.h": "c",
+        "types.h": "c"
     },
     "C_Cpp.default.includePath": [
         "/opt/homebrew/include "

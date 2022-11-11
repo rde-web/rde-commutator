@@ -1,15 +1,12 @@
-#include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <signal.h>
+#include <stdbool.h>
+#include <sys/socket.h>
 #include "rde-commutator/err.h"
-#include "rde-commutator/config.h"
 #include "path-join/path-join.h"
+#include "rde-commutator/config.h"
 
 void serve_daemon_gateway(int tcp_connection, const char* id) {
     char* sock_path = path_join(DAEMON_SOCK_LOCATION, id);

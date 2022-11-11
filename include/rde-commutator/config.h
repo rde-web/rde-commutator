@@ -1,6 +1,6 @@
 // @todo from file
-#define DAEMON_SOCK_LOCATION "tmp/d"
-#define CLIENT_SOCK_LOCATION "tmp/cl"
+#define DAEMON_SOCK_LOCATION "/tmp/d"
+#define CLIENT_SOCK_LOCATION "/tmp/c"
 
 #define MAX_MSG_SIZE 256
 #define TCP_BACKLOG 128
